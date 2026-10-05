@@ -784,6 +784,56 @@ html {
     max-height: calc(100vh - 10em - 25px);
 }
 
+/* Voice recording */
+:root:not(.noVNC_connected) #noVNC_voice_button {
+    display: none;
+}
+#noVNC_voice_transcript {
+    width: 360px;
+    min-width: 150px;
+    height: 100px;
+    min-height: 60px;
+
+    box-sizing: border-box;
+    max-width: 100%;
+    margin-top: 10px;
+}
+#noVNC_voice_playback {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+}
+#noVNC_voice_status {
+    margin-top: 10px;
+    min-height: 1.2em;
+}
+#noVNC_voice_record_button.noVNC_voice_recording {
+    background-color: #c33;
+    color: #fff;
+}
+.noVNC_voice_submit_button {
+    flex: 1;
+    padding: 10px 0;
+    font-size: 1.1em;
+    font-weight: bold;
+    background-color: #1a6ecc;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.noVNC_voice_submit_button:hover {
+    background-color: #1558a3;
+}
+#noVNC_voice_url_input {
+    width: 360px;
+    min-width: 150px;
+
+    box-sizing: border-box;
+    max-width: 100%;
+    margin-top: 6px;
+}
+
 /* Settings */
 #noVNC_settings {
 }

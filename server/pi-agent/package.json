@@ -1,0 +1,8 @@
+{
+  "name": "voiceos-pi-agent",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.87.1"
+  }
+}

@@ -1,0 +1,12 @@
+# LiteLLM proxy config for the VoiceOS agent.
+# Exposes an OpenAI-compatible endpoint on 127.0.0.1:4000 that Pi talks to.
+# The upstream model is routed through OpenRouter; the key comes from
+# OPENAI_API_KEY (or OPENROUTER_API_KEY, normalized in entrypoint.sh).
+model_list:
+  - model_name: deepseek-v4.1-flash
+    litellm_params:
+      model: openrouter/deepseek/deepseek-v4.1-flash
+      api_key: os.environ/OPENAI_API_KEY
+
+litellm_settings:
+  drop_params: true

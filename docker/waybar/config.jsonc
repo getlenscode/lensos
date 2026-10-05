@@ -1,0 +1,80 @@
+// VoiceOS Waybar config for Sway — uses the peakflava style.css.
+// Modules that need hardware or extra services (battery, backlight,
+// network, pulseaudio, weather) are omitted in the container.
+{
+    "layer": "top",
+    "position": "top",
+    "height": 52,
+    "margin-top": 8,
+    "margin-left": 10,
+    "margin-right": 10,
+    "spacing": 4,
+    "modules-left": ["custom/launcher", "clock"],
+    "modules-center": ["sway/workspaces", "sway/window"],
+    "modules-right": ["tray", "cpu", "memory", "custom/notification"],
+    "reload_style_on_change": true,
+
+    "custom/launcher": {
+        "format": "",
+        "on-click": "rofi -show drun",
+        "tooltip": false
+    },
+
+    "clock": {
+        "format": "{:%H:%M}",
+        "format-alt": "{:%a, %d %b}",
+        "tooltip-format": "<tt><small>{calendar}</small></tt>"
+    },
+
+    "sway/workspaces": {
+        "format": "{icon}",
+        "format-icons": {
+            "1": "一",
+            "2": "二",
+            "3": "三",
+            "4": "四",
+            "5": "五",
+            "6": "六",
+            "7": "七",
+            "8": "八",
+            "9": "九",
+            "10": "十"
+        },
+        "persistent-workspaces": {
+            "*": 5
+        }
+    },
+
+    "sway/window": {
+        "format": "{}",
+        "max-length": 40
+    },
+
+    "tray": {
+        "icon-size": 21,
+        "spacing": 10,
+        "show-passive-items": true
+    },
+
+    "cpu": {
+        "format": " {usage}%",
+        "on-click": "kitty --class btop -e btop",
+        "tooltip": false
+    },
+
+    "memory": {
+        "format": " {percentage}%",
+        "tooltip-format": "{used:0.1f}GiB / {total:0.1f}GiB"
+    },
+
+    "custom/notification": {
+        "tooltip": true,
+        "format": "{}",
+        "return-type": "json",
+        "exec": "~/.config/waybar/scripts/notification-tray.sh count",
+        "interval": 5,
+        "on-click": "~/.config/waybar/scripts/notification-tray.sh show",
+        "on-click-right": "~/.config/waybar/scripts/notification-tray.sh dnd-toggle",
+        "signal": 9
+    }
+}

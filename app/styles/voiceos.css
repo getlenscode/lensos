@@ -1,0 +1,252 @@
+/* VoiceOS dock: the remote desktop stays visible behind the controls. */
+#noVNC_control_bar_anchor,
+#noVNC_control_bar_anchor.noVNC_right,
+#noVNC_control_bar_anchor.noVNC_top,
+#noVNC_control_bar_anchor.noVNC_bottom {
+    position: fixed;
+    inset: auto auto 16px 50%;
+    width: max-content;
+    max-width: calc(100vw - 24px);
+    height: auto;
+    display: block !important;
+    transform: translateX(-50%);
+    opacity: 1;
+    z-index: 10;
+}
+:root.noVNC_connected #noVNC_control_bar_anchor.noVNC_idle { opacity: 1; }
+#noVNC_control_bar,
+.noVNC_right #noVNC_control_bar,
+.noVNC_top #noVNC_control_bar,
+.noVNC_bottom #noVNC_control_bar,
+#noVNC_control_bar.noVNC_open {
+    position: static;
+    left: auto;
+    top: auto;
+    border: 1px solid rgba(255, 255, 255, .34);
+    border-radius: 23px;
+    background: linear-gradient(145deg, rgba(34, 47, 69, .72), rgba(13, 20, 35, .79));
+    box-shadow: 0 20px 50px rgba(0, 0, 0, .38), inset 0 1px 0 rgba(255, 255, 255, .28);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    color: white;
+    overflow: visible;
+}
+#noVNC_control_bar::before,
+#noVNC_control_bar_handle,
+.noVNC_hint_anchor { display: none !important; }
+#noVNC_control_bar > .noVNC_scroll,
+:is(.noVNC_top, .noVNC_bottom) > #noVNC_control_bar > .noVNC_scroll {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 7px;
+    max-width: calc(100vw - 24px);
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: visible;
+    padding: 9px 13px;
+    scrollbar-width: none;
+}
+#noVNC_control_bar .noVNC_scroll::-webkit-scrollbar { display: none; }
+#noVNC_control_bar .noVNC_scroll > hr { display: none; }
+.voiceos_mark {
+    flex: none;
+    font: 800 15px/1 system-ui, sans-serif;
+    letter-spacing: -.06em;
+    padding: 0 6px;
+    color: white;
+}
+.voiceos_mark span { color: #91e4ff; }
+.voiceos_divider {
+    height: 28px;
+    width: 1px;
+    flex: none;
+    margin: 0 2px;
+    background: rgba(255, 255, 255, .26);
+}
+#noVNC_control_bar .noVNC_button,
+.voiceos_launcher,
+.voiceos_workspaces button {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    box-sizing: border-box;
+    padding: 7px;
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 13px;
+    background: rgba(255, 255, 255, .09);
+    color: white;
+    cursor: pointer;
+    transition: transform .2s cubic-bezier(.2,.8,.2,1.4), background .2s, box-shadow .2s;
+}
+.voiceos_launcher { font: 24px/1 system-ui, sans-serif; }
+.voiceos_launcher img { display: block; width: 100%; height: 100%; }
+#noVNC_control_bar .noVNC_button:hover,
+.voiceos_launcher:hover,
+.voiceos_workspaces button:hover {
+    transform: translateY(-7px) scale(1.12);
+    background: rgba(255, 255, 255, .23);
+    box-shadow: 0 9px 15px rgba(0,0,0,.2);
+}
+#noVNC_voice_button { background: rgba(85, 178, 255, .25) !important; }
+#noVNC_voice_button.noVNC_selected { box-shadow: 0 0 0 3px rgba(111, 203, 255, .35); }
+#noVNC_voice_button.noVNC_recording {
+    background: rgba(235, 68, 95, .55) !important;
+    animation: voiceos-pulse 1.2s ease-in-out infinite;
+}
+@keyframes voiceos-pulse {
+    50% { box-shadow: 0 0 0 8px rgba(235, 68, 95, 0); }
+}
+.voiceos_workspaces { display: flex; gap: 3px; }
+.voiceos_workspaces button {
+    width: 30px;
+    min-width: 30px;
+    height: 32px;
+    padding: 0;
+    font: 600 13px system-ui, sans-serif;
+    border-radius: 10px;
+}
+.voiceos_workspaces button.voiceos_active {
+    background: rgba(106, 205, 255, .42);
+    border-color: rgba(176, 235, 255, .7);
+}
+/* The legacy panels are kept, but open above the dock. */
+#noVNC_control_bar_anchor > .noVNC_panel,
+.noVNC_bottom .noVNC_panel,
+.noVNC_top .noVNC_panel,
+.noVNC_right .noVNC_panel {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 14px);
+    top: auto;
+    width: min(410px, calc(100vw - 26px));
+    max-width: calc(100vw - 26px);
+    max-height: calc(100vh - 112px);
+    transform: translate(-50%, 14px) scale(.97);
+    transform-origin: bottom center;
+    background: rgba(24, 34, 54, .94);
+    border: 1px solid rgba(255, 255, 255, .25);
+    border-radius: 20px;
+    box-shadow: 0 20px 55px rgba(0,0,0,.44);
+    color: #f3f8ff;
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+}
+#noVNC_control_bar_anchor > .noVNC_panel.noVNC_open {
+    transform: translate(-50%, 0) scale(1);
+}
+#noVNC_control_bar_anchor > .noVNC_panel .noVNC_heading {
+    background: rgba(255,255,255,.1);
+    color: white;
+}
+#noVNC_voice_results { max-height: 120px; overflow: auto; font-size: 13px; }
+#noVNC_voice_results button { display: block; width: 100%; text-align: left; overflow-wrap: anywhere; }
+#noVNC_voice { text-align: center; position: relative; }
+#noVNC_voice_close_button {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    box-sizing: border-box;
+    margin: 0;
+    border: none;
+    border-radius: 8px;
+    background: rgba(255,255,255,.12);
+    color: #dfe9ff;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+}
+#noVNC_voice_close_button:hover { background: rgba(255,255,255,.25); }
+#noVNC_voice_status { margin-top: 4px; font-size: 13px; opacity: .85; }
+#noVNC_voice_transcript {
+    min-height: 20px;
+    margin-top: 8px;
+    font-size: 14px;
+    color: #dfe9ff;
+    overflow-wrap: anywhere;
+}
+#noVNC_voice_text_input {
+    width: 100%;
+    margin-top: 10px;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,.25);
+    background: rgba(0,0,0,.25);
+    color: inherit;
+}
+#noVNC_voice .button_row { flex-wrap: wrap; }
+#noVNC_voice .button_row input { flex: 1 1 42%; min-width: 0; }
+
+/* Siri-style orb: layered blurred gradient blobs that spin slowly when
+   idle, breathe and brighten while listening, and swirl fast while the
+   request is being processed. */
+#voiceos_orb {
+    position: relative;
+    width: 92px;
+    height: 92px;
+    margin: 10px auto 2px;
+    cursor: pointer;
+    animation: orb-breathe 4.5s ease-in-out infinite;
+}
+#voiceos_orb .orb_blob {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    filter: blur(13px);
+    mix-blend-mode: screen;
+    opacity: .55;
+    transition: opacity .4s;
+}
+#voiceos_orb .orb_a {
+    background: radial-gradient(circle at 32% 30%, #8b5cf6, transparent 62%);
+    animation: orb-spin 9s linear infinite;
+}
+#voiceos_orb .orb_b {
+    background: radial-gradient(circle at 70% 62%, #06b6d4, transparent 62%);
+    animation: orb-spin 12s linear infinite reverse;
+}
+#voiceos_orb .orb_c {
+    background: radial-gradient(circle at 50% 82%, #a78bfa, transparent 58%);
+    animation: orb-spin 15s linear infinite;
+}
+#voiceos_orb .orb_ring {
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    border: 1px solid rgba(139, 92, 246, .55);
+    box-shadow: 0 0 18px rgba(6, 182, 212, .35), inset 0 0 22px rgba(139, 92, 246, .25);
+}
+#voiceos_orb.listening { animation: orb-breathe 1.6s ease-in-out infinite; }
+#voiceos_orb.listening .orb_blob { opacity: .95; filter: blur(10px); }
+#voiceos_orb.listening .orb_a { animation-duration: 4s; }
+#voiceos_orb.listening .orb_b { animation-duration: 5.5s; }
+#voiceos_orb.listening .orb_c { animation-duration: 7s; }
+#voiceos_orb.listening .orb_ring {
+    animation: orb-ring-pulse 1.6s ease-in-out infinite;
+}
+#voiceos_orb.thinking { animation: orb-breathe 1.1s ease-in-out infinite; }
+#voiceos_orb.thinking .orb_blob { opacity: .85; filter: blur(9px); }
+#voiceos_orb.thinking .orb_a { animation-duration: 1.6s; }
+#voiceos_orb.thinking .orb_b { animation-duration: 2.1s; }
+#voiceos_orb.thinking .orb_c { animation-duration: 2.6s; }
+@keyframes orb-spin { to { transform: rotate(360deg); } }
+@keyframes orb-breathe { 50% { transform: scale(1.07); } }
+@keyframes orb-ring-pulse {
+    50% { transform: scale(1.12); border-color: rgba(34, 211, 238, .8); }
+}
+@media (max-width: 650px) {
+    #noVNC_control_bar_anchor { bottom: 8px; }
+    #noVNC_control_bar > .noVNC_scroll { padding: 7px; }
+    .voiceos_mark, .voiceos_workspaces, .voiceos_divider { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    #noVNC_control_bar .noVNC_button,
+    .voiceos_launcher,
+    .voiceos_workspaces button,
+    #noVNC_control_bar_anchor > .noVNC_panel { transition: none; }
+    #noVNC_voice_button.noVNC_recording { animation: none; }
+}

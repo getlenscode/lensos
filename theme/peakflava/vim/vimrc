@@ -1,0 +1,26 @@
+" VoiceOS Vim configuration — peakflava theme.
+set nocompatible
+syntax on
+filetype plugin indent on
+
+set number relativenumber
+set cursorline
+set scrolloff=8
+
+set expandtab tabstop=4 softtabstop=4 shiftwidth=4
+set smarttab smartindent autoindent
+
+set ignorecase smartcase
+set incsearch hlsearch
+
+set undofile
+set confirm
+set mouse=a
+set background=dark
+set termguicolors
+
+if has("unnamedplus")
+  set clipboard=unnamedplus
+endif
+
+colorscheme peakflava

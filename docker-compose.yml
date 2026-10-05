@@ -1,0 +1,40 @@
+# VoiceOS desktop in a container: noVNC web UI on :6080, Pi voice agent,
+# and BrowserOS autostarted with its built-in MCP server.
+#
+#   docker compose up -d --build
+#   open http://localhost:6080/vnc.html
+#
+# BrowserOS MCP endpoint (Streamable HTTP, unauthenticated — localhost only):
+#   http://localhost:6080/mcp  — nginx proxies to BrowserOS on 127.0.0.1:9200.
+#   Direct-URL MCP client:  { "url": "http://localhost:6080/mcp" }
+#   stdio bridge:           npx -y mcp-remote http://localhost:6080/mcp
+
+services:
+  voiceos:
+    build: .
+    image: voiceos
+    # BrowserOS only ships x86_64 Linux builds; on Apple Silicon this runs
+    # under Rosetta (matches the Dockerfile's --platform pin).
+    platform: linux/amd64
+    ports:
+      - "6080:6080"
+    env_file:
+      # API keys for transcription + the Pi agent (see .env.example).
+      - path: .env
+        required: false
+    volumes:
+      # Named volume so the image's bundled config (themes, dotfiles, Neovim
+      # plugins) seeds the desktop home on first start.
+      - voiceos-home:/home/voiceos
+      # BrowserOS profile (cookies, logins, .browseros/server_config.json)
+      # survives rebuilds and can be backed up independently of home.
+      - browseros-profile:/home/voiceos/.browseros-profile
+    shm_size: "2gb"
+    restart: unless-stopped
+
+volumes:
+  # Fixed name: reuse the volume the documented `docker run` command creates,
+  # so switching to Compose keeps the existing desktop home.
+  voiceos-home:
+    name: voiceos-home
+  browseros-profile:

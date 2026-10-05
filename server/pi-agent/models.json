@@ -1,0 +1,12 @@
+{
+  "providers": {
+    "litellm": {
+      "baseUrl": "http://127.0.0.1:4000/v1",
+      "api": "openai-completions",
+      "apiKey": "$OPENAI_API_KEY",
+      "models": [
+        { "id": "deepseek-v4.1-flash", "name": "DeepSeek v4.1 Flash (LiteLLM)" }
+      ]
+    }
+  }
+}

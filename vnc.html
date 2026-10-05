@@ -13,7 +13,8 @@
     or the fragment:
         http://example.com/#host=HOST&port=PORT&encrypt=1
     -->
-    <title>noVNC</title>
+    <title>VoiceOS</title>
+    <meta charset="utf-8">
 
     <link rel="icon" type="image/x-icon" href="app/images/icons/novnc.ico">
     <meta name="theme-color" content="#313131">
@@ -40,6 +41,7 @@
     <link rel="stylesheet" href="app/styles/constants.css">
     <link rel="stylesheet" href="app/styles/base.css">
     <link rel="stylesheet" href="app/styles/input.css">
+    <link rel="stylesheet" href="app/styles/voiceos.css">
 
     <!-- Images that will later appear via CSS -->
     <link rel="preload" as="image" href="app/images/info.svg">
@@ -116,8 +118,19 @@
 
             <div class="noVNC_scroll">
 
-            <img class="noVNC_logo" src="app/images/icons/novnc-icon-35x21.svg"
-                 alt="noVNC">
+            <span class="voiceos_mark" title="VoiceOS">V<span>O</span></span>
+            <span class="voiceos_divider" aria-hidden="true"></span>
+            <button type="button" class="voiceos_launcher" data-command="open terminal" title="Open terminal" aria-label="Open terminal"><img src="app/images/terminal.svg" alt=""></button>
+            <button type="button" class="voiceos_launcher" data-command="open browser" title="Open browser" aria-label="Open browser"><img src="app/images/browser.svg" alt=""></button>
+            <button type="button" class="voiceos_launcher" data-command="open files" title="Open files" aria-label="Open files"><img src="app/images/files.svg" alt=""></button>
+            <span class="voiceos_divider" aria-hidden="true"></span>
+            <div class="voiceos_workspaces" aria-label="Workspaces">
+                <button type="button" data-command="workspace 1" title="Workspace 1">1</button>
+                <button type="button" data-command="workspace 2" title="Workspace 2">2</button>
+                <button type="button" data-command="workspace 3" title="Workspace 3">3</button>
+                <button type="button" data-command="workspace 4" title="Workspace 4">4</button>
+            </div>
+            <span class="voiceos_divider" aria-hidden="true"></span>
 
             <hr>
 
@@ -185,6 +198,33 @@
                     Edit clipboard content in the textbox below.
                 </p>
                 <textarea id="noVNC_clipboard_text" rows=5></textarea>
+            </div>
+            </div>
+
+            <!-- Voice input -->
+            <input type="image" alt="Voice" src="app/images/mic.svg"
+                id="noVNC_voice_button" class="noVNC_button"
+                title="Voice recording">
+            <div class="noVNC_crosscenter">
+            <div id="noVNC_voice" class="noVNC_panel">
+                <button type="button" id="noVNC_voice_close_button"
+                    aria-label="Close" title="Close">&times;</button>
+                <div id="voiceos_orb" class="idle" role="button" tabindex="0"
+                    aria-label="Talk to VoiceOS" title="Talk to VoiceOS">
+                    <span class="orb_blob orb_a"></span>
+                    <span class="orb_blob orb_b"></span>
+                    <span class="orb_blob orb_c"></span>
+                    <span class="orb_ring"></span>
+                </div>
+                <div id="noVNC_voice_status">Tap the mic and speak</div>
+                <div id="noVNC_voice_transcript" aria-live="polite"></div>
+                <div id="noVNC_voice_results" aria-live="polite"></div>
+                <div class="button_row">
+                    <input type="button" id="noVNC_voice_cancel_button" value="Cancel">
+                </div>
+                <input type="text" id="noVNC_voice_text_input"
+                    placeholder="Or type a command and press Enter"
+                    aria-label="Type a command">
             </div>
             </div>
 
@@ -353,7 +393,7 @@
     <!-- Connect button -->
     <div class="noVNC_center">
         <div id="noVNC_connect_dlg">
-            <p class="noVNC_logo" translate="no"><span>no</span>VNC</p>
+            <p class="noVNC_logo" translate="no"><span>Voice</span>OS</p>
             <div>
                 <button id="noVNC_connect_button">
                     <img alt="" src="app/images/connect.svg"> Connect

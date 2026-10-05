@@ -1,0 +1,6 @@
+flask
+websockify
+requests
+python-dotenv
+pillow
+litellm[proxy]

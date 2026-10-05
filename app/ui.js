@@ -19,9 +19,13 @@ import RFB from "../core/rfb.js";
 import WakeLockManager from './wakelock.js';
 import * as WebUtil from "./webutil.js";
 
-const PAGE_TITLE = "noVNC";
+const PAGE_TITLE = "VoiceOS";
 
 const LINGUAS = ["cs", "de", "el", "es", "fr", "hr", "hu", "it", "ja", "ko", "nl", "pl", "pt_BR", "ru", "sv", "tr", "uk", "zh_CN", "zh_TW"];
+
+// Backend that proxies audio transcription requests to Groq (see server/transcribe_server.py)
+const VOICE_MAX_BYTES = 19.5 * 1024 * 1024;
+const VOICE_ALLOWED_EXTENSIONS = ["flac", "mp3", "mp4", "mpeg", "mpga", "m4a", "ogg", "wav", "webm"];
 
 const UI = {
 
@@ -48,6 +52,18 @@ const UI = {
     inhibitReconnect: true,
     reconnectCallback: null,
     reconnectPassword: null,
+
+    voiceRecording: false,
+    voiceMediaRecorder: null,
+    voiceMediaStream: null,
+    voiceChunks: [],
+    voiceBlob: null,
+    voiceSpeechRecognition: null,
+    voiceLiveText: "",
+    voiceWatchdog: null,
+    voiceLastHeard: 0,
+    voiceAborted: false,
+    voiceProcessing: false,
 
     wakeLockManager: new WakeLockManager(),
 
@@ -112,12 +128,8 @@ const UI = {
         }
 
         // Restore control bar position
-        const pos = WebUtil.readSetting('controlbar_pos');
-        if (['left', 'right', 'top', 'bottom'].includes(pos)) {
-            UI.toggleControlbarSide(pos);
-        } else {
-            UI.toggleControlbarSide('left');
-        }
+        UI.toggleControlbarSide('bottom');
+        UI.mountVoiceOSPanels();
 
         UI.initFullscreen();
 
@@ -128,6 +140,7 @@ const UI = {
         UI.addMachineHandlers();
         UI.addConnectionControlHandlers();
         UI.addClipboardHandlers();
+        UI.addVoiceHandlers();
         UI.addSettingsHandlers();
         document.getElementById("noVNC_status")
             .addEventListener('click', UI.hideStatus);
@@ -347,6 +360,42 @@ const UI = {
             .addEventListener('click', UI.toggleClipboardPanel);
         document.getElementById("noVNC_clipboard_text")
             .addEventListener('change', UI.clipboardSend);
+    },
+
+    addVoiceHandlers() {
+        // One tap starts listening, the next tap (or a pause in speech)
+        // finishes the request — Siri-style.
+        document.getElementById("noVNC_voice_button")
+            .addEventListener('click', UI.toggleVoiceAssistant);
+        document.getElementById("voiceos_orb")
+            .addEventListener('click', UI.toggleVoiceAssistant);
+        document.getElementById("noVNC_voice_cancel_button")
+            .addEventListener('click', UI.cancelVoiceRequest);
+        document.getElementById("noVNC_voice_close_button")
+            .addEventListener('click', () => {
+                // Closing mid-listen discards the recording entirely.
+                UI.voiceAborted = true;
+                UI.closeVoicePanel();
+                UI.voiceOrb('idle');
+                document.getElementById('noVNC_voice_status').textContent = "";
+            });
+        document.getElementById("noVNC_voice_text_input")
+            .addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && e.target.value.trim()) {
+                    UI.runVoiceCommand(e.target.value.trim());
+                    e.target.value = "";
+                }
+            });
+        document.querySelectorAll('[data-command]').forEach(button => {
+            button.addEventListener('click', () => UI.runVoiceCommand(button.dataset.command));
+        });
+    },
+
+    mountVoiceOSPanels() {
+        const anchor = document.getElementById('noVNC_control_bar_anchor');
+        document.querySelectorAll('#noVNC_control_bar .noVNC_panel').forEach(panel => {
+            anchor.append(panel);
+        });
     },
 
     // Add a call to save settings when the element changes,
@@ -943,6 +992,7 @@ const UI = {
         UI.closeSettingsPanel();
         UI.closePowerPanel();
         UI.closeClipboardPanel();
+        UI.closeVoicePanel();
         UI.closeExtraKeys();
     },
 
@@ -1087,6 +1137,282 @@ const UI = {
 /* ------^-------
  *  /CLIPBOARD
  * ==============
+ *    VOICE
+ * ------v------*/
+
+    openVoicePanel() {
+        UI.closeAllPanels();
+        UI.openControlbar();
+
+        document.getElementById('noVNC_voice')
+            .classList.add("noVNC_open");
+        document.getElementById('noVNC_voice_button')
+            .classList.add("noVNC_selected");
+    },
+
+    closeVoicePanel() {
+        if (UI.voiceRecording) {
+            UI.stopVoiceRecording();
+        }
+
+        document.getElementById('noVNC_voice')
+            .classList.remove("noVNC_open");
+        document.getElementById('noVNC_voice_button')
+            .classList.remove("noVNC_selected");
+    },
+
+    toggleVoicePanel() {
+        if (document.getElementById('noVNC_voice')
+            .classList.contains("noVNC_open")) {
+            UI.closeVoicePanel();
+        } else {
+            UI.openVoicePanel();
+        }
+    },
+
+    voiceOrb(state) {
+        document.getElementById('voiceos_orb').className = state;
+    },
+
+    toggleVoiceAssistant() {
+        if (UI.voiceRecording) {
+            UI.stopVoiceRecording();
+        } else if (!UI.voiceProcessing) {
+            UI.openVoicePanel();
+            UI.startVoiceRecording();
+        }
+    },
+
+    async startVoiceRecording() {
+        const statusElem = document.getElementById('noVNC_voice_status');
+        const transcriptElem = document.getElementById('noVNC_voice_transcript');
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            statusElem.textContent = _("Audio recording is not supported by this browser.");
+            return;
+        }
+
+        let stream;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (err) {
+            Log.Error("Could not start voice recording: " + err);
+            statusElem.textContent = _("Could not access the microphone.");
+            UI.voiceOrb('idle');
+            return;
+        }
+
+        UI.voiceMediaStream = stream;
+        UI.voiceChunks = [];
+        UI.voiceLiveText = "";
+        UI.voiceAborted = false;
+        transcriptElem.textContent = "";
+
+        UI.voiceMediaRecorder = new MediaRecorder(stream);
+        UI.voiceMediaRecorder.addEventListener('dataavailable', (e) => {
+            if (e.data && e.data.size > 0) {
+                UI.voiceChunks.push(e.data);
+            }
+        });
+        UI.voiceMediaRecorder.addEventListener('stop', () => {
+            const blob = new Blob(UI.voiceChunks, { type: 'audio/webm' });
+            UI.voiceBlob = blob;
+            if (!UI.voiceAborted) {
+                UI.transcribeAndRun(blob);
+            }
+        });
+        UI.voiceMediaRecorder.start();
+
+        const SpeechRecognitionImpl = window.SpeechRecognition ||
+            window.webkitSpeechRecognition;
+        if (SpeechRecognitionImpl) {
+            const recognition = new SpeechRecognitionImpl();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = document.documentElement.lang || 'en-US';
+
+            recognition.addEventListener('result', (e) => {
+                let transcript = "";
+                for (let i = 0; i < e.results.length; i++) {
+                    transcript += e.results[i][0].transcript;
+                }
+                UI.voiceLiveText = transcript;
+                UI.voiceLastHeard = Date.now();
+                transcriptElem.textContent = transcript;
+            });
+            recognition.addEventListener('error', (e) => {
+                Log.Warn("Speech recognition error: " + e.error);
+            });
+
+            UI.voiceSpeechRecognition = recognition;
+            recognition.start();
+        }
+
+        // Siri-style endpointing: stop shortly after the speaker goes quiet,
+        // or after a hard cap so the mic can't be left on forever.
+        UI.voiceLastHeard = Date.now();
+        UI.voiceWatchdog = setInterval(() => {
+            if (!UI.voiceRecording) {
+                return;
+            }
+            const quietMs = Date.now() - UI.voiceLastHeard;
+            if ((UI.voiceLiveText.trim() && quietMs > 1600) || quietMs > 30000) {
+                UI.stopVoiceRecording();
+            }
+        }, 400);
+
+        UI.voiceRecording = true;
+        UI.voiceOrb('listening');
+        document.getElementById('noVNC_voice_button').classList.add('noVNC_recording');
+        statusElem.textContent = _("Listening...");
+    },
+
+    stopVoiceRecording() {
+        clearInterval(UI.voiceWatchdog);
+        UI.voiceWatchdog = null;
+
+        if (UI.voiceMediaRecorder && UI.voiceMediaRecorder.state !== 'inactive') {
+            UI.voiceMediaRecorder.stop();
+        }
+        UI.voiceMediaRecorder = null;
+
+        if (UI.voiceMediaStream) {
+            UI.voiceMediaStream.getTracks().forEach(track => track.stop());
+            UI.voiceMediaStream = null;
+        }
+
+        if (UI.voiceSpeechRecognition) {
+            UI.voiceSpeechRecognition.stop();
+            UI.voiceSpeechRecognition = null;
+        }
+
+        UI.voiceRecording = false;
+        document.getElementById('noVNC_voice_button').classList.remove('noVNC_recording');
+        UI.voiceOrb('thinking');
+        document.getElementById('noVNC_voice_status').textContent = _("Transcribing...");
+    },
+
+    async transcribeAndRun(blob) {
+        const statusElem = document.getElementById('noVNC_voice_status');
+        const transcriptElem = document.getElementById('noVNC_voice_transcript');
+
+        UI.voiceProcessing = true;
+        let text = "";
+        try {
+            if (blob.size > VOICE_MAX_BYTES) {
+                throw new Error(_("Recording exceeds the 19.5MB limit."));
+            }
+            const formData = new FormData();
+            formData.append('file', blob, 'recording.webm');
+            const resp = await fetch(UI.voiceApiBase() + "/api/transcribe", {
+                method: 'POST',
+                body: formData,
+            });
+            const data = await resp.json();
+            if (!resp.ok) {
+                throw new Error(data.error || resp.statusText);
+            }
+            text = (data.text || "").trim();
+        } catch (err) {
+            Log.Error("Voice transcription failed: " + err);
+            // Fall back to whatever the browser heard live.
+            text = UI.voiceLiveText.trim();
+        }
+
+        if (!text) {
+            UI.voiceProcessing = false;
+            UI.voiceOrb('idle');
+            statusElem.textContent = _("Didn't catch anything — try again.");
+            return;
+        }
+
+        transcriptElem.textContent = text;
+        statusElem.textContent = _("Working...");
+        await UI.runVoiceCommand(text);
+        UI.voiceProcessing = false;
+        UI.voiceOrb('idle');
+    },
+
+    voiceApiBase() {
+        return window.location.origin;
+    },
+
+    async runVoiceCommand(commandText) {
+        const text = commandText ||
+            document.getElementById('noVNC_voice_text_input').value.trim();
+        const statusElem = document.getElementById('noVNC_voice_status');
+        const results = document.getElementById('noVNC_voice_results');
+        if (!text) {
+            UI.openVoicePanel();
+            statusElem.textContent = _("Say or type a command first.");
+            return;
+        }
+        statusElem.textContent = _("Working...");
+        results.replaceChildren();
+        try {
+            let resp = await fetch(UI.voiceApiBase() + (commandText ? "/api/command" : "/api/agent"), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text }),
+            });
+            let data = await resp.json();
+            if (!resp.ok && resp.status === 400 && commandText && data.error &&
+                    data.error.includes("not recognized")) {
+                statusElem.textContent = _("Pi is working...");
+                resp = await fetch(UI.voiceApiBase() + "/api/agent", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text }),
+                });
+                data = await resp.json();
+            }
+            if (!resp.ok) throw new Error(data.error || resp.statusText);
+            statusElem.textContent = data.message;
+            if (data.files) {
+                data.files.forEach(path => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.textContent = path;
+                    button.title = _("Open file");
+                    button.addEventListener('click', () => UI.runVoiceCommand('open file ' + path));
+                    results.append(button);
+                });
+                UI.openVoicePanel();
+            }
+            if (data.action === 'workspace') {
+                document.querySelectorAll('.voiceos_workspaces button').forEach(button => {
+                    button.classList.toggle('voiceos_active', button.dataset.command === text.toLowerCase());
+                });
+            }
+        } catch (err) {
+            statusElem.textContent = _("Command failed: ") + err.message;
+            UI.openVoicePanel();
+        }
+    },
+
+    async cancelVoiceRequest() {
+        const statusElem = document.getElementById('noVNC_voice_status');
+        if (UI.voiceRecording) {
+            UI.voiceAborted = true;
+            UI.stopVoiceRecording();
+            UI.voiceOrb('idle');
+            statusElem.textContent = _("Cancelled.");
+            return;
+        }
+        try {
+            const resp = await fetch(UI.voiceApiBase() + "/api/cancel", {
+                method: 'POST',
+            });
+            const data = await resp.json();
+            statusElem.textContent = data.message || data.error;
+        } catch (err) {
+            statusElem.textContent = _("Cancel failed: ") + err.message;
+        }
+    },
+
+/* ------^-------
+ *   /VOICE
+ * ==============
  *  CONNECTION
  * ------v------*/
 
@@ -1189,6 +1515,10 @@ const UI = {
 
     disconnect() {
         UI.rfb.disconnect();
+
+        if (UI.voiceRecording) {
+            UI.stopVoiceRecording();
+        }
 
         UI.connected = false;
 
