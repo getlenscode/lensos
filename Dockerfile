@@ -1,6 +1,8 @@
-# Pinned to amd64: BrowserOS (the desktop's default browser) only ships
-# Linux builds for x86_64. On Apple Silicon this runs under Rosetta.
-FROM --platform=linux/amd64 debian:forky-slim
+# Builds natively for the host architecture. BrowserOS (the desktop's
+# default browser) and Discord only ship amd64 Linux builds. On arm64,
+# BrowserOS comes from a locally built .deb in docker/browseros/; Discord
+# is skipped.
+FROM debian:forky-slim
 
 ENV NOVNC_PORT=6080 \
     PATH=/opt/noVNC/server/pi-agent/node_modules/.bin:$PATH \
@@ -11,6 +13,7 @@ ENV NOVNC_PORT=6080 \
     DEBIAN_FRONTEND=noninteractive
 
 # Layer 1: system packages (rarely changes)
+COPY docker/browseros/ /tmp/browseros-local/
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         hyprland sway wayvnc kitty thunar firefox-esr chromium vim htop \
@@ -20,10 +23,15 @@ RUN apt-get update \
         python3 nodejs npm nginx openssl xdg-utils dbus-user-session libcap2-bin wtype wl-clipboard \
         libgl1-mesa-dri xwayland ca-certificates curl \
         git make gcc g++ unzip tar grim socat \
-    && curl -LsSf -o /tmp/browseros.deb \
-         "https://github.com/browseros-ai/BrowserOS/releases/download/v0.50.5/BrowserOS_v0.50.5_amd64.deb" \
-    && apt-get install -y /tmp/browseros.deb \
-    && rm -f /tmp/browseros.deb \
+    && if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
+         curl -LsSf -o /tmp/browseros.deb \
+             "https://github.com/browseros-ai/BrowserOS/releases/download/v0.50.5/BrowserOS_v0.50.5_amd64.deb" \
+         && apt-get install -y /tmp/browseros.deb \
+         && rm -f /tmp/browseros.deb; \
+       else \
+         apt-get install -y /tmp/browseros-local/BrowserOS_neo_v0.51.1.3_arm64.deb; \
+       fi \
+    && rm -rf /tmp/browseros-local \
     && setcap -r /usr/bin/Hyprland \
     && sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
     && locale-gen \
@@ -36,19 +44,21 @@ RUN apt-get update \
 # is the entrypoint script, not systemd, so "snap install" has nothing to
 # talk to. The .deb installs a standard /usr/share/applications entry, so
 # rofi's app launcher (drun mode) picks it up with no extra wiring.
+# Discord's download endpoint only serves amd64 .debs, so this is skipped
+# on arm64.
 RUN apt-get update \
-    && curl -LsSf -o /tmp/discord.deb \
-         "https://discord.com/api/download?platform=linux&format=deb" \
-    && apt-get install -y /tmp/discord.deb \
-    && rm -f /tmp/discord.deb \
-    # Electron aborts on the SUID sandbox check inside a container, so both
-    # terminal and rofi launches go through flags (same as browser-launch.sh).
-    && printf '%s\n' '#!/bin/sh' \
-         'export ELECTRON_DISABLE_SANDBOX=1' \
-         'exec /usr/bin/discord --no-sandbox --disable-gpu --disable-dev-shm-usage --ozone-platform=wayland "$@"' \
-         > /usr/local/bin/discord \
-    && chmod +x /usr/local/bin/discord \
-    && sed -i 's|^Exec=/usr/bin/discord|Exec=/usr/local/bin/discord|' /usr/share/applications/discord.desktop \
+    && if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
+         curl -LsSf -o /tmp/discord.deb \
+             "https://discord.com/api/download?platform=linux&format=deb" \
+         && apt-get install -y /tmp/discord.deb \
+         && rm -f /tmp/discord.deb \
+         && printf '%s\n' '#!/bin/sh' \
+             'export ELECTRON_DISABLE_SANDBOX=1' \
+             'exec /usr/bin/discord --no-sandbox --disable-gpu --disable-dev-shm-usage --ozone-platform=wayland "$@"' \
+             > /usr/local/bin/discord \
+         && chmod +x /usr/local/bin/discord \
+         && sed -i 's|^Exec=/usr/bin/discord|Exec=/usr/local/bin/discord|' /usr/share/applications/discord.desktop; \
+       fi \
     && rm -rf /var/lib/apt/lists/*
 
 # Layer 2: pinned upstream builds not packaged for Debian forky/arm64

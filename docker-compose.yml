@@ -13,9 +13,6 @@ services:
   voiceos:
     build: .
     image: voiceos
-    # BrowserOS only ships x86_64 Linux builds; on Apple Silicon this runs
-    # under Rosetta (matches the Dockerfile's --platform pin).
-    platform: linux/amd64
     ports:
       - "6080:6080"
     env_file:
